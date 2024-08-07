@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
@@ -18,6 +19,7 @@ final _allProcesses = <Process>[];
 
 Future<void> _dartRun(List<String> args,
     {void Function(String)? onStdout, String? workingDir}) async {
+  print('Running ${Platform.executable} with args ${jsonEncode(args)}');
   final process = await Process.start(
     Platform.executable,
     args,
@@ -29,8 +31,12 @@ Future<void> _dartRun(List<String> args,
   if (onStdout != null) {
     broadStdout.lines().listen(onStdout);
   }
-  process.stderr.listen(stderr.add);
+  process.stderr.transform(utf8.decoder).listen((s) {
+    print('stderr: $s');
+    stderr.write(s);
+  });
   final result = await process.exitCode;
+  print('Process exited with code $result');
   if (result != 0) {
     throw ProcessException(Platform.executable, args, '', result);
   }
@@ -42,6 +48,7 @@ Future<String?> _packageNameFromConfig(String packageDir) async {
 }
 
 void _watchExitSignal(ProcessSignal signal) {
+  print('Got exit signal $signal, terminating processes');
   signal.watch().listen((sig) {
     for (final process in _allProcesses) {
       process.kill(sig);
